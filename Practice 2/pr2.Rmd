@@ -1,0 +1,191 @@
+---
+title: "Практика №2 Статистический анализ качественных признаков по таблицам сопряженности"
+author: "Долаева А.Р., г. 20.М04-мм"
+date: "06/04/2021"
+output: 
+    pdf_document:
+        latex_engine: xelatex
+keep_tex: true        
+header-includes:
+   - \XeTeXdefaultencoding cp1251
+   - \usepackage{xltxtra}
+   - \usepackage{fontspec}
+   - \setmainfont{Times New Roman}
+   - \newfontfamily{\cyrillicfont}{Times New Roman}
+   - \usepackage[english,russian]{babel}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Вариант (с) Депрессия и гиперимия (depressed.mood.1, hyperemia.1), слабость и бессонница (weakness.1, insomia.1)
+
+Функции вычисления энтропии и неопределнности
+```{r}
+Entropy<-function(x){
+  p<-x/sum(x);
+  pp<-p[p!=0]
+  -sum(p*log(p,2))
+}
+
+Uncertain<-function(tab){
+  Hxy<-Entropy(as.vector(tab));Hxy
+  Hx<-Entropy(rowSums(tab));Hx
+  Hy<-Entropy(colSums(tab));Hy
+  I<-Hx+Hy-Hxy;I
+  c(I/Hx*100, I/Hy*100, 2*I/(Hx+Hy)*100)
+}
+```
+
+1. Построить две таблицы сопряженности по двум парам качественных признаков
+
+1.1 (depressed.mood.1, hyperemia.1)
+```{r}
+data <- read.table(file = "data.csv", header = TRUE, sep = ",")
+X1<-data$depressed.mood.1;X1
+Y1<-data$hyperemia.1;Y1
+Y1<-ifelse(Y1<2,1,2)
+tab1<-table(depressed=X1, hyperemia=Y1);tab1
+```
+
+1.2 (weakness.1, insomia.1)
+```{r}
+X2<-data$weakness.1;X2
+X2<-ifelse(X2<2,1,2)
+Y2<-data$insomia.1;Y2
+Y2<-ifelse(Y2<2,1,2)
+tab2<-table(weakness=X2, insomia=Y2);tab2
+```
+
+2. Вычислить условные вероятности и указать на значимость их различия по критерию хи-квадрат и по точному критерию Фишера
+
+2.1 (depressed.mood.1, hyperemia.1)
+```{r}
+tab1[,2]/rowSums(tab1)
+fisher.test(tab1)
+chisq.test(tab1)
+```
+
+При слабой депрессии сильная гипермия наблюдается в 21% случаев, а при ее усилении в более чем 66% случаев.
+Критерии дали разные результаты:
+по критерию Фишера pvalue = 0,047<0,05 - а значит, различие в частотах нельзя объяснить случайностью; 
+по критерию хи-квадрат pvalue = 0,086>0,05 - результаты не значимы.
+
+2.2 (weakness.1, insomia.1)
+```{r}
+tab2[,2]/rowSums(tab2)
+fisher.test(tab2)$p.value
+chisq.test(tab2)
+```
+
+При низкой слабости сильная бессоница наблюдается в более чем 54% случаев, а при ее увеличении в более чем 43% случаев.
+Различие в частотах можно быть случайностью:
+по критерию Фишера pvalue = 0,732>0,05; 
+по критерию хи-квадрат pvalue = 0,731>0,05
+
+
+3. Вычислить коэффициенты неопределенности
+
+3.1 (depressed.mood.1, hyperemia.1)
+```{r}
+Uncertain(tab1)
+```
+
+Для признака депрессия неопределенность меньше, чем для признака гипермия.
+Коэффициент неопределенности в случае зависимой переменной депрессия 14% больше, чем в случае зависимой переменной гипермия 10%.
+Для признака депрессия неопределенность меньше, чем для признака гипермия.
+Большая доля информации о депрессия определяется тем, есть гипермия или нет, 14%.
+Если гипермия несильная, то высокая депрессия встречается у 1 из 12 человек, при сильной гипермии шансы 2 из 5.
+
+3.2 (weakness.1, insomia.1)
+```{r}
+Uncertain(tab2)
+```
+
+Для признаков слабость и бессоница наблюдается высокая неопределенность, что говорит о сильной зависимости значений 9/17 и 7/17.
+Либо разичия в показаниях случайны, либо требуется большая выборка.
+
+4. Применить критерии Мак-Немара и Кохрена для проверки значимых изменений во времени
+
+```{r}
+library(nonpar)
+library(plyr)
+Name<-"depressed.mood"
+A<-sapply(colnames(data),function(x)substr(x,1,nchar(Name)))
+data.<-apply(data[,names(A[A==Name])],2,function(x)ifelse(x<2,1,2))
+tab<-table(data.[,1],data.[,2])
+tab
+mcnemar.test(data.[,1],data.[,2])
+```
+
+Для дисперсии проверяем гипотезу о том, что количество ухудшившихся (1) равно количеству улучшившихся (3) на второй день.
+По критерию Мак-Немара: Значимость p-value = 0.6171 > 0.05, результаты не значимы.
+
+```{r}
+data..<-na.omit(data.[,seq(3)])-1
+colnames(data..)
+cochrans.q(data.., alpha = 0.05)
+```
+
+По критерию Кохрена  p-value = 0.042 < 0.05, в течение трех дней у больных существенное уменьшилась депрессия.
+
+```{r}
+Name<-"hyperemia"
+A<-sapply(colnames(data),function(x)substr(x,1,nchar(Name)))
+data.<-apply(data[,names(A[A==Name])],2,function(x)ifelse(x<1,0,1))
+tab<-table(data.[,1],data.[,2])
+tab
+mcnemar.test(data.[,1],data.[,2])
+```
+
+Для гипермии проверяем гипотезу о том, что количество ухудшившихся (1) равно количеству улучшившихся (10) на второй день.
+По критерию Мак-Немара: Значимость p-value = 0.01 < 0.05, поэтому можно говорить о значимом улучшении на второй день по признаку гипермии.
+
+```{r}
+data..<-na.omit(data.[,seq(3)])-1
+colnames(data..)
+cochrans.q(data.., alpha = 0.05)
+```
+
+По критерию Кохрена  p-value = 1 > 0.05, улучшение по признаку гипермии на третий день не значимо, можно объяснить случайностью.
+
+```{r}
+Name<-"weakness"
+A<-sapply(colnames(data),function(x)substr(x,1,nchar(Name)))
+data.<-apply(data[,names(A[A==Name])],2,function(x)ifelse(x<2,1,2))
+tab<-table(data.[,1],data.[,2])
+tab
+mcnemar.test(data.[,1],data.[,2])
+```
+
+Для слабости проверяем гипотезу о том, что количество ухудшившихся (2) равно количеству улучшившихся (11) на второй день.
+По критерию Мак-Немара: Значимость p-value = 0.02 < 0.05, поэтому можно говорить о значимом улучшении на второй день по признаку слабости.
+
+```{r}
+data..<-na.omit(data.[,seq(3)])-1
+colnames(data..)
+cochrans.q(data.., alpha = 0.05)
+```
+
+По критерию Кохрена  p-value = 0.003 < 0.05, улучшение по признаку слабости на третий день существенно.
+
+```{r}
+Name<-"insomia"
+A<-sapply(colnames(data),function(x)substr(x,1,nchar(Name)))
+data.<-apply(data[,names(A[A==Name])],2,function(x)ifelse(x<1,0,1))
+tab<-table(data.[,1],data.[,2])
+tab
+mcnemar.test(data.[,1],data.[,2])
+```
+
+Для бессоницы проверяем гипотезу о том, что количество ухудшившихся (1) равно количеству улучшившихся (12) на второй день.
+По критерию Мак-Немара: Значимость p-value = 0.005 < 0.05, поэтому можно говорить о существенном улучшении.
+
+```{r}
+mcnemar.test(data.[,1],data.[,2])
+data..<-na.omit(data.[,seq(3)])-1
+colnames(data..)
+cochrans.q(data.., alpha = 0.05)
+```
+
+По критерию Кохрена  p-value = 1 > 0.05, улучшение по признаку бессоница на третий день не значимо.

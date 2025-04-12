@@ -1,0 +1,422 @@
+---
+title: "Практика №3 Проверка гипотез однородности"
+author: "Долаева А.Р., г. 20.М04-мм"
+date: "12 05 2021"
+output: 
+    pdf_document:
+        latex_engine: xelatex
+keep_tex: true        
+header-includes:
+   - \XeTeXdefaultencoding cp1251
+   - \usepackage{xltxtra}
+   - \usepackage{fontspec}
+   - \setmainfont{Times New Roman}
+   - \newfontfamily{\cyrillicfont}{Times New Roman}
+   - \usepackage[english,russian]{babel}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library('lawstat')
+library(moments)
+library("agricolae")
+library("multcomp")
+library("readxl")
+addicts <- read_excel("addicts.xls")
+dataNF <- read_excel("dataNF.xls")
+```
+
+### Вариант №9.
+Данные (addicts.xls). Варианты метрической переменной (variable), категориальной с двумя градациями (factor.2), категориальной с четырьмя градациями (factor.4) соответственно по 9 варианту:
+
+| variant | variable | factor.2 | factor.4 |
+| ------- |:--------:| --------:| --------:|
+| 9       |  rabdru  |  curwor  |   prcod  |
+
+
+<br>
+rabdru - оценка риска в употреблении наркотиков
+
+curwor - занятость:  
+0 – не работает,  
+1 – работает
+
+prcod - лечебный препарат:  
+1 – ноутрексон и плацебо,  
+2 – плацебо и плацебо,  
+3 – ноутрексон и антидепрессант,  
+4 – плацебо и антидепрессант.
+
+```{r}
+var <- addicts$rabdru;
+fact2 <- addicts$curwor;
+fact4 <- addicts$prcod
+```
+
+#### 1. Проверить гипотезу о равенстве дисперсий двух выборок и в соответствии с выводом применить критерий Стьюдента для проверки равенства средних. Использовать вариант группирующей переменной factor.2  
+
+<p>
+Pаспределение метрических данных по категориальным признакам
+
+```{r}
+df2<-na.omit(data.frame(group=as.factor(fact2),X=as.numeric(var)));
+table(fact2);
+```
+
+---
+График "ящика с усами"
+```{r ev='cairo_pdf', out.width='70%', out.height='50%', fig.align="center"}
+boxplot(X~group, df2, xlab = "curwor", ylab = "rabdru")
+```
+
+У тех, кто не работает(0), риск употребления наркотиков в среднем выше, чем у тех, кто работает(1).
+Требуется проверить значимость различия дисперсий и средних между выборками категориальных признаков curwor (0 и 1).  
+
+---  
+Применение критерия Шапиро–Уилка для проверка на согласованность с нормальным распределением
+
+```{r}
+p.Sh<-with(df2, tapply(X, group, function(x) shapiro.test(x)$p.value));p.Sh;
+```
+
+Доверительные уровни ниже 0.05, значит гипотеза согласия с нормальным распределением отвергается для обеих выборок.  
+(Следует применить непараметрические критерии. Вычислим позже.)
+
+```{r ev='cairo_pdf', out.width='70%', out.height='50%', fig.align="center"}
+Fig<-function(x)
+{
+  hist(x,freq=FALSE);
+  f1<-function(x)dnorm(x,mean(x,na.rm=TRUE),sd(x,na.rm=TRUE));
+  curve(f1,min(x),max(x),col=2,add=TRUE);
+  title(sub=paste("p.Shapiro",format(shapiro.test(x)$p.value,4,2),sep="="))
+};
+
+op<-par(mfrow=c(1,2));
+Fig(df2$X[df2$group==0]);
+Fig(df2$X[df2$group==1])
+```
+
+Как видно из гистограмм распределений выборок по категориальным признакам, графики имеют выраженную правостороннюю асимметрию: 0.21 и 0.61.  
+
+```{r}
+c(skewness(df2$X[df2$group==0]), skewness(df2$X[df2$group==1]))
+```
+
+Хоть выборки не согласованы с нормальным распределением, применим критерии Фишера и Стьюдента для проверки равенства дисперсий.
+(скрепя сердцем)    
+
+---  
+параметрические критерии: статистика Фишера и Стьюдента 
+
+```{r}
+p.F<-var.test(X~group, df2)$p.value;p.F;
+```
+
+Гипотеза равенства дисперсий не отвергается, так как из статистики Фишера получаем доверительный уровень 0.82 > 0.05.
+Дисперсии оказались одинаковыми, значит мы можем применить статистику Стьюдента для вычисления значимости различия в риске употребления наркотиков у работающих и нет.  
+
+```{r}
+p.T<-t.test(X~group, df2, var.equal=TRUE)$p.value;p.T
+```
+
+pvalue = 0.22 > 0.05, значит различие может быть случайным.
+
+```{r}
+mm<-tapply(df2$X,df2$group, function(x) mean(x, na.rm = TRUE));
+Sd<-tapply(df2$X,df2$group, function(x) sd(x, na.rm = TRUE));
+nn<-tapply(df2$X,df2$group, function(x) length(na.omit(x)));
+err<-Sd/sqrt(nn);
+paste(mm[1], '±', err[1], ' / ', nn[1]);
+paste(mm[2], '±', err[2], ' / ', nn[2]);
+```
+
+Среднее в группе (0) равно  8.36±0.35 по 204 объему выборки, в группе (1) равно 7.51±0.59/12 по 76,
+различие незначимо, так как p=0.22
+
+#### 1.1.Повторить обработки с применением непараметрических аналогов для независимых выборок.  
+
+Для проверки гипотезы однородности двух медиан используется критерий Вилкоксона (точный) или его приближенный вариант критерий Манна-Уитни.
+
+Вычисляем критерии: точный Вилкоксона, Манна-Уитни и Манна-Уитни с поправкой. И выводим квантили.
+
+```{r}
+wilcox.test(X~group,df2,exact=TRUE);
+wilcox.test(X~group,df2,exact=FALSE,correct=FALSE);
+wilcox.test(X~group,df2,exact=FALSE);
+
+quantile(df2$X[df2$group==0]);
+quantile(df2$X[df2$group==1]);
+```
+
+Несколько видов непараметрическиого критерия Вилкоксона показывают доверительный уровень 0.16 > 0.05.
+Значит различие в средних незначимо.
+
+#### 2. Применить однофакторный дисперсионный анализ в случае фактора с четырьмя градациями и множественные сравнения с разными поправками. Проверить гипотезу о равенстве дисперсий  
+
+```{r}
+df4<-na.omit(data.frame(group=as.factor(fact4),X=as.numeric(var)));
+table(df4$group)
+```
+
+```{r ev='cairo_pdf', out.width='70%', out.height='50%', fig.align="center"}
+boxplot(X~group,xlab="prcod",ylab="rabdru",data=df4)
+```
+
+Из графика можно предположить, что риск употреблении наркотиков (rabdru) в среднем выше при приёме ноутрексона и антидепрессантов (prcod = 3) и
+ниже при приёме ноутрексона и плацебо (prcod = 1).
+
+```{r}
+p.Sh<-with(df4, tapply(X, group, function(x) shapiro.test(x)$p.value));p.Sh
+```
+
+Выборки не согласуются с нормальным распредлением (сердце всё ещё скрепим), но всё равно проведём тест.
+
+```{r ev='cairo_pdf', out.width='70%', out.height='50%', fig.align="center"}
+op<-par(mfrow=c(2,2));
+Fig(df4$X[df4$group==1]);
+Fig(df4$X[df4$group==2]);
+Fig(df4$X[df4$group==3]);
+Fig(df4$X[df4$group==4])
+```
+
+Наблюдаем правосторонюю асимметрию в некоторых выборках.
+
+```{r}
+c(skewness(df4$X[df4$group==1]), skewness(df4$X[df4$group==2]),
+  skewness(df4$X[df4$group==3]), skewness(df4$X[df4$group==4]))
+```
+
+Проверим гипотезу о равенстве дисперсий (хоть нет соответствия с нормальным распределением).
+
+критерий Бартлетта для проверки равенства дисперсий
+```{r}
+bartlett.test(X~group,df4)
+```
+
+критерий Левена для проверики гипотезы о равенстве дисперсий
+```{r}
+with(df4,levene.test(X,group))
+```
+
+Оба критерия показывают высокий доверительный уровень 0.64 > 0.05 (Бартлетт) и 0.55 > 0.05 (Левен)
+Значит делаем вывод, что гипотеза о равенстве дисперсий не отвергается, они одинаковы.  
+Так как соблюдено требование о равенстве дисперсий, мы можем применить однофакторный дисперсионный анализ.
+
+---  
+
+однофакторный дисперсионный анализ
+
+```{r}
+ao<-aov(X~group,df4)
+summary(ao)
+```
+
+pvalue = 0.485> 0.05, что сообщает нам о возможной случайности различия дисперсий.
+Значит различие при применении разных лекарств и риска употреблении наркотиков незначимо.
+
+---
+
+Выведем статистические показатели
+
+```{r}
+mm<-tapply(df4$X,df4$group, function(x) mean(x, na.rm = TRUE));
+Sd<-tapply(df4$X,df4$group, function(x) sd(x, na.rm = TRUE));
+nn<-tapply(df4$X,df4$group, function(x) length(na.omit(x)));
+err<-Sd/sqrt(nn);
+paste(mm[1], '±', err[1], ' / ', nn[1]);
+paste(mm[2], '±', err[2], ' / ', nn[2]);
+paste(mm[3], '±', err[3], ' / ', nn[3]);
+paste(mm[4], '±', err[4], ' / ', nn[4]);
+
+quantile(df4$X[df4$group==1]);
+quantile(df4$X[df4$group==2]);
+quantile(df4$X[df4$group==3]);
+quantile(df4$X[df4$group==4])
+
+```
+
+#### 2.1. Повторить обработки с применением непараметрических аналогов.  
+
+Проверим гипотезу однородности двух медиан критерием Краскела-Уоллиса для более двух выборок.
+
+```{r}
+kruskal.test(X~group,df4)
+```
+
+Доверительный уровень 0.49 > 0.05, различие в средних может быть случайным, незначимо.
+
+---  
+
+Применим множественные сравнения: с поправкой Бонферони и Тьюки. (Для проверки различия среди групп).
+
+```{r}
+out <- LSD.test(ao,"group", p.adj="none",group=FALSE)$comparison$pvalue
+out1 <- LSD.test(ao,"group", p.adj="bonferroni",group=FALSE)$comparison$pvalue
+out2 <- LSD.test(ao,"group", p.adj="holm",group=FALSE)$comparison$pvalue
+out3 <- LSD.test(ao,"group", p.adj="BH",group=FALSE)$comparison$pvalue
+
+res <- data.frame(pair = c('1 - 2', '1 - 3', '1 - 4', '2 - 3', '2 - 4', '3 - 4'), 
+                  none = out, bonferroni = out1, holm = out2, BH=out3)
+res
+```
+
+Так как в выборках одинаковое число наблюдений, можем применить критерий Тьюки.
+
+```{r}
+TukeyHSD(ao, "group", ordered = TRUE)
+```
+
+```{r ev='cairo_pdf', out.width='70%', out.height='50%', fig.align="center"}
+plot(TukeyHSD(ao, "group"))
+```
+
+Значимые отличия в группах, применявших разные лекарства, не наблюдаются ни по одному из методов множественных сравнений.
+
+#### 3. Повторить обработки с применением непараметрических аналогов.  
+
+Вычисления приведены в разделах 1.1 и 2.1.
+
+#### 4. Для двух зависимых переменных BDI.1 BDI.2 проверить однородность изменений во времени по критерию Стьюдента для зависимых выборок и по ранговому критерию Вилкоксона.  
+
+Шкала депрессии Бека (Beck Depression Inventory, BDI) в 1, 2, 5 и 7 дни
+
+| variant |   X1  |   X2  |   X3  |  X4  |
+| ------- |:-----:| -----:| -----:|-----:|
+| 9       | BDI.1 | BDI.2 | BDI.5 | BDI.7|
+
+---  
+
+```{r}
+colMeans(dataNF[,c("BDI.1","BDI.2")], na.rm = TRUE)
+```
+
+Уменьшение среднего показателя депрессии на второй день.
+
+--- 
+
+критерий Стьдента для проверки равенства средних
+
+```{r}
+t.test(dataNF$BDI.1,dataNF$BDI.2, paired = TRUE)
+```
+
+Доверительный уровень 2.2e-16 < 0.05, значит уменьшение депрессии на второй день можно считать значимым.
+
+---  
+
+Непараметрические критерии однородности для двух и нескольких зависимых выборок.  
+
+критерий знаков
+```{r}
+tab<-table(sign(dataNF$BDI.2-dataNF$BDI.1));tab
+binom.test(min(tab), sum(tab), p = 0.5,
+alternative = "less",
+conf.level = 0.95)
+```
+
+ранговый Вилкоксона
+
+```{r}
+wilcox.test(dataNF$BDI.2, dataNF$BDI.1,paired=TRUE,exact = FALSE)
+```
+
+Friedman
+```{r}
+A<-sapply(colnames(dataNF),function(x)substr(x,1,nchar("BDI")))
+dat<-dataNF[,names(A[A=="BDI"])]
+friedman.test(as.matrix(dat[,c(1,2,5,7)]))
+```
+
+Различие в средних значимо, pvalue < 0.05.
+
+#### 5. Для зависимых переменны с факторами "PRCOD.1"и "SEX.1"выполнить ANOVA Repeated Measures. Проверить значимость факторов "PRCOD.1"и "SEX.1 времени и эффектов взаимодействия.  
+
+Исследование динамики показателей.
+Выбираем данные: группирующие переменные "PRCOD.1"и "SEX.1
+и наблюдения показателелей шкалы депрессии Бека в три момента времени BD1, BD2, BD5.
+
+применим ANOVA Repeated Measures и выведем таблицу дисперсионного анализа
+```{r}
+dat.AR<-na.omit(data.frame(PRCOD=dataNF$PRCOD.1,SEX =dataNF$SEX.1,
+              BD1 = dataNF$BDI.1, BD2 = dataNF$BDI.2, BD5 = dataNF$BDI.5))
+m<-ncol(dat.AR)-2;
+
+dat.AR.T<-data.frame(
+   stack(dat.AR[,-seq(2)]),
+   # cols of BDI
+   sub=as.factor(rep(seq(nrow(dat.AR)),m)),
+   # PRCOD factor
+   gr1=as.factor(rep(dat.AR[,1],m)),
+   # SEX factor
+   gr2=as.factor(rep(dat.AR[,2],m)) );
+dat.AR.T$values<-as.numeric(dat.AR.T$values);
+
+formula <-values~(gr1 + gr2)*ind + Error(sub/ind);
+ao <-aov(formula, dat.AR.T);
+summary(ao)
+```
+
+p = 0.02148 < 0.05, следовательно, влияние фактора лекарств значимо для уровня депрессии,  
+p = 0.00242 < 0.05, влияние фактора пола значимо для уровня депрессии.
+
+средний уровень депрессии в группах соответсвенно равны:
+
+```{r}
+FF<- function (name, krit) {
+   temp <- dat.AR[krit ==name,];
+   df<-rbind(data.frame(x = temp$BD1), data.frame(x = temp$BD2),
+             data.frame(x = temp$BD5));
+   mm<-mean(df$x);
+   er<-sd(df$x)/sqrt(length(df$x));er;
+   paste("for", name, mm, '±', er)
+}
+
+FF('male', dat.AR$SEX)
+FF('female', dat.AR$SEX)
+FF('NLTX+Framex', dat.AR$PRCOD)
+FF('NLTX+Placebo', dat.AR$PRCOD)
+FF('Placebo+Framex', dat.AR$PRCOD)
+FF('Placebo+Placebo', dat.AR$PRCOD)
+```
+
+выводим средние
+
+```{r}
+model.tables(ao ,'mean')
+```
+
+```{r ev='cairo_pdf', out.width='70%', out.height='50%', fig.align="center"}
+Names<-names(table(dat.AR[,1]));K<-length(Names)
+
+interaction.plot(x.factor=dat.AR.T$ind,
+trace.factor=dat.AR.T$gr1,
+response=dat.AR.T$values,
+fun = mean,
+type = "b", legend = FALSE,
+trace.label ="group",
+xlab = "",
+ylab = 'BDI',
+lty = seq(K), col = seq(K), pch = 20, lwd=2
+)
+legend('topright',Names,lty = seq(K), col =seq(K), cex=0.7,pch=20)
+```
+Присутствует некоторая взаимосвязь среди групп. Особенно среди групп, принимавших Placebo+Framex и Placebo+Placebo.  
+
+```{r ev='cairo_pdf', out.width='70%', out.height='50%', fig.align="center"}
+
+Names<-names(table(dat.AR[,2]));K<-length(Names)
+
+interaction.plot(x.factor=dat.AR.T$ind,
+trace.factor=dat.AR.T$gr2,
+response=dat.AR.T$values,
+fun = mean,
+type = "b", legend = FALSE,
+trace.label ="group",
+xlab = "",
+ylab = 'BDI',
+lty = seq(K), col = seq(K), pch = 20, lwd=2
+)
+legend('topright',Names,lty = seq(K), col =seq(K), cex=0.7,pch=20)
+```
+Две линии, соответствующие полам, проходят почти параллельно друг другу. Это означает, отсутствие эффекта взаимодействия
+факторов пола.

@@ -1,0 +1,21 @@
+---
+title: "Практика №6 Анализ данных типа времени жизни."
+author: "Долаева А.Р., г.20.М04-мм"
+date: "26/05/2021"
+output: 
+    pdf_document:
+        latex_engine: xelatex
+keep_tex: true        
+header-includes:
+   - \XeTeXdefaultencoding cp1251
+   - \usepackage{xltxtra}
+   - \usepackage{fontspec}
+   - \setmainfont{Times New Roman}
+   - \newfontfamily{\cyrillicfont}{Times New Roman}
+   - \usepackage[english,russian]{babel}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+

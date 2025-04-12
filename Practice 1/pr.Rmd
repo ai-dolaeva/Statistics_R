@@ -1,0 +1,211 @@
+---
+title: "Практика №1 Моделирование и описательная статистика"
+author: "Долаева А.Р., г. 20.М04-мм"
+date: "06/04/2021"
+output: 
+    pdf_document:
+        latex_engine: xelatex
+keep_tex: true        
+header-includes:
+   - \XeTeXdefaultencoding cp1251
+   - \usepackage{xltxtra}
+   - \usepackage{fontspec}
+   - \setmainfont{Times New Roman}
+   - \newfontfamily{\cyrillicfont}{Times New Roman}
+   - \usepackage[english,russian]{babel}
+---
+```{r  setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE)
+```
+### Вариант 5. Гаммма распределение Γ($\alpha$ = 1, $\lambda$ = 4)
+
+Параметры обозначенные с точкой вычислены по формулам:
+mu. = $\frac{\lambda}{\alpha}$;
+sigma2. = $\frac{\alpha}{\lambda^{2}}$;
+sigma. = $\frac{\alpha^{1/2}}{\lambda}$.
+
+Парметры без точки вычисляются на основе статистических формул.
+
+1.  Моделирование распределения
+```{r}
+rate <- 1
+shape <- 4
+N <- 100
+X <- rgamma(N, shape, rate);X[0:10]
+peak = dgamma((shape-1)/rate,shape/rate)
+```
+
+2. Построение гистограммы плотности гамма распределения
+```{r dev='cairo_pdf', out.width='70%', out.height='50%'}
+
+hist(X,freq=FALSE,ylim=c(0,peak), main="")
+f.<-function(x)dgamma(x,shape/rate)
+curve(f.,0,15,add=TRUE,col=3)
+
+```
+
+2. Нахождение математического ожидания
+```{r}
+mu <-mean(X)
+mu.<-shape/rate
+c(mu.=mu.,mu=mu)
+```
+```{r dev='cairo_pdf', out.width='70%', out.height='50%'}
+plot(f.,0,15, type = "l", lty = 1, main="", ylab="")
+abline(v = mu, col="red")
+abline(v = mu., col="blue")
+legend('topright',c("mu", "mu."),pch=20,col=c("red","blue"))
+```
+
+2. Дисперсии
+```{r}
+sigma<-sd(X)
+sigma2.<-shape/(rate^2)
+c(sigma2.=sigma2.,sigma2=sigma^2)
+```
+
+2. Cтандартного отклонения
+```{r}
+sigma.= sqrt(sigma2.)
+c(sigma.=sigma.,sigma=sigma)
+```
+```{r dev='cairo_pdf', out.width='70%', out.height='50%'}
+plot(f.,0,15, type = "l", lty = 1, main="",  ylab="")
+abline(v = mu+sigma, col="red")
+abline(v = mu-sigma, col="blue")
+```
+
+2. Ошибки среднего
+```{r}
+c(me.=sigma./sqrt(N),me=sigma/sqrt(N))
+```
+
+2. Медианы
+```{r}
+c(mu.=mu., mu=mu, median=median(X))
+```
+
+2. Минимума
+```{r}
+min(X)
+```
+
+2. Максимума
+```{r}
+max(X)
+```
+
+2. Размаха
+```{r}
+max(X)-min(X)
+```
+
+2. Квартилей
+```{r}
+q<-quantile(X, probs = seq(0, 1, 0.25));q
+```
+median = q[50%]
+
+
+2. Интервартильного размаха
+```{r}
+Q<-q[4]-q[2];Q
+```
+```{r dev='cairo_pdf', out.width='70%', out.height='50%'}
+plot(f.,0,15, type = "l", lty = 1, main="",  ylab="")
+abline(v = q[2], col="red")
+abline(v = q[4], col="blue")
+```
+
+2. Ассимметирии (положительное значение - правый хвост длинее, правосторонняя ассиметрия)
+```{r}
+library(moments)
+m3<-moment(X, order = 3, central = TRUE)
+c(mean((X-mu.)^3), mean((X-mu)^3), m3) # третий момент
+c(m3/sigma.^3, m3/sigma^3, skewness(X)) # ассимметирия
+```
+
+2. Эксцесса (положительный показатель - “вытянутое” распределение)
+```{r}
+c(mean((X-mean(X))^4),m4<-moment(X, order = 4, central = TRUE)) # четвертый момент
+m2<-moment(X, order = 2, central = TRUE) # второй момент
+c(kurtosis(X)-3,m4/m2^2-3) # эксцесс
+```
+
+3. Оценка параметров распределения
+по методу моментов
+```{r dev='cairo_pdf', out.width='70%', out.height='50%'}
+hist(X,freq=FALSE,ylim=c(0,peak), main="")
+f.<-function(x)dgamma(x,shape/rate)
+f<-function(x)dgamma(x,mean(X))
+curve(f,0,15,add=TRUE,col=2)
+curve(f.,0,15,add=TRUE,col=3)
+legend('topright',c("mu.","mean(X)"),pch=20,col=c(2,3))
+```
+по методу максимального правдоподобия
+```{r dev='cairo_pdf', out.width='70%', out.height='50%'}
+Func.prob.log <- function(x) -sum(dnorm(X, mean = x[1], log = TRUE))
+res<-optim(c(mu.,sigma.),Func.prob.log)
+mu..<-res$par[1];
+f..<-function(x)dgamma(x,mu..)
+hist(X,freq=FALSE, ylim=c(0,0.25),main="")
+curve(f,0,15,add=TRUE,col=2)
+curve(f.,0,15,add=TRUE,col=3)
+curve(f..,0,15,add=TRUE,col=4,lty=2)
+legend('topright',c("mu.","mean(X)","оценка правдоподобия"),pch=20,col=c(2,3,4),lty=c(1,1,2))
+```
+
+4. Проверка согласия эмпирического и теоретического распределения по критерию хи-квадрат Пирсона
+```{r dev='cairo_pdf'}
+h<-hist(X,plot=FALSE)
+# эмпирического распределения по критерию хи-квадрат Пирсона
+n.i<-sapply(seq(length(h$breaks)-1)+1,function(i)
+length(X[X<h$breaks[i] & X>=h$breaks[i-1]]))
+p.i<-sapply(seq(length(h$breaks)-1)+1,function(i)
+pgamma(h$breaks[i],mu..)-pgamma(h$breaks[i-1],mu..))
+sum(p.i)
+```
+```{r}
+# теоретического распределения по критерию хи-квадрат Пирсона
+p.i[1]<-pgamma(h$breaks[2],mu..)
+p.i[length(p.i)]<-1-pgamma(h$breaks[length(h$breaks)-1],mu..)
+sum(p.i)
+```
+
+доверительный уровень вероятности
+```{r}
+#проверка условия n*p_i>5
+tab<-cbind(h$counts,p.i*length(X))
+tab
+t1<-cumsum(tab[,2]);T1<-min(which(t1>5))
+t1
+t2<-cumsum(tab[seq(nrow(tab),1,-1),2]);t2;T2<-min(which(t1>5))
+T2<-nrow(tab)-T2
+T2
+Tab<-apply(tab,2,function(x) c(sum(x[seq(T1)]),x[c((T1+1):T2)],sum(x[c((T2+1):nrow(tab))])))
+Tab
+
+chi2<-sum(apply(Tab,1,function(x) (x[1]-x[2])^2/x[2])) # статистика хи-квадрат
+p.value<-1-pchisq(chi2,nrow(Tab)-3);
+print(paste("p.value",round(p.value,4),sep="="))
+```
+
+Вероятность получения случайного отклонения. Ошибка в
+```{r}
+round(p.value,4)*100
+```
+% случаев
+
+5. Моделирование выборки с нормальным законом распределения и применить критерий согласия Шапиро-Уилка
+```{r dev='cairo_pdf', out.width='70%', out.height='50%'}
+pp<-sapply(seq(200),function(x)shapiro.test(rnorm(100,4,12))$p.value)
+plot(ecdf(pp))
+lines(c(0,1),c(0,1),type="l",col=2)
+title(sub=paste("p",format(ks.test(pp, "punif")$p.value,3,2),sep="=" ))
+```
+Ошибка в
+```{r }
+round(ks.test(pp, "punif")$p.value*100,2)
+```
+ % случаев
+ 
